@@ -147,17 +147,17 @@ def take_photo(output_dir, position_index):
         print(f"Error taking photo: {e}")
         return False
 
-def eight_step_rotation_with_photos(port, baudrate, servo_id, output_dir, start_position=0, end_position=4095):
+def eight_step_rotation_with_photos(port, baudrate, servo_id, output_dir, start_position=0):
     """
     Moves servo through 8 equal distant positions and takes a photo at each position.
+    Performs a complete 360-degree rotation starting from the specified position.
     
     Args:
         port (str): The serial port name.
         baudrate (int): The communication baud rate.
         servo_id (int): The ID of the servo to control.
         output_dir (str): Directory to save photos.
-        start_position (int): Starting position (default: 0).
-        end_position (int): Ending position (default: 4095).
+        start_position (int): Starting position (0-4095).
     """
     # Create output directory if it doesn't exist
     try:
@@ -168,9 +168,14 @@ def eight_step_rotation_with_photos(port, baudrate, servo_id, output_dir, start_
         print(f"Error creating output directory {output_dir}: {e}")
         return
     
-    # Calculate 8 equal distant positions
-    step = (end_position - start_position) / 7  # 7 steps to get 8 positions
-    positions = [int(start_position + i * step) for i in range(8)]
+    # Calculate 8 positions for a full 360-degree rotation
+    # Each step is 1/8th of a full rotation (4096 / 8 = 512 units)
+    step_size = 4096 // 8  # 512 units per step
+    positions = []
+    
+    for i in range(8):
+        position = (start_position + i * step_size) % 4096
+        positions.append(position)
     
     print(f"Starting 8-step rotation with photos")
     print(f"Positions: {positions}")
@@ -232,13 +237,7 @@ def main():
         "--start-position",
         type=int,
         default=0,
-        help="Starting position for rotation (0-4095)."
-    )
-    parser.add_argument(
-        "--end-position",
-        type=int,
-        default=4095,
-        help="Ending position for rotation (0-4095)."
+        help="Starting position for 360-degree rotation (0-4095). All other positions are calculated as 1/8th increments from this position."
     )
 
     args = parser.parse_args()
@@ -247,22 +246,13 @@ def main():
     if not (0 <= args.start_position <= 4095):
         print("Error: Start position must be between 0 and 4095.")
         sys.exit(1)
-    
-    if not (0 <= args.end_position <= 4095):
-        print("Error: End position must be between 0 and 4095.")
-        sys.exit(1)
-    
-    if args.start_position >= args.end_position:
-        print("Error: Start position must be less than end position.")
-        sys.exit(1)
 
     eight_step_rotation_with_photos(
         port=args.port,
         baudrate=args.baudrate,
         servo_id=args.servo_id,
         output_dir=args.output_dir,
-        start_position=args.start_position,
-        end_position=args.end_position
+        start_position=args.start_position
     )
 
 if __name__ == "__main__":
