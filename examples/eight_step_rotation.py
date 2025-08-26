@@ -86,10 +86,18 @@ def take_photo(output_dir, position_index):
     Returns:
         bool: True if successful, False otherwise.
     """
+    # Ensure output directory exists
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+    except Exception as e:
+        print(f"Error creating output directory {output_dir}: {e}")
+        return False
+    
     filename = f"photo_{position_index:02d}.png"
-    filepath = os.path.join(output_dir, filename)
+    filepath = os.path.abspath(os.path.join(output_dir, filename))
     
     print(f"Taking photo: {filename}")
+    print(f"Full path: {filepath}")
     
     try:
         # Run the rpicam-still command
@@ -102,13 +110,23 @@ def take_photo(output_dir, position_index):
             "--datetime"
         ]
         
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        print(f"Running command: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
         
         if result.returncode == 0:
-            print(f"Photo saved successfully: {filepath}")
-            return True
+            # Check if file was actually created
+            if os.path.exists(filepath):
+                print(f"Photo saved successfully: {filepath}")
+                return True
+            else:
+                print(f"Error: Photo file was not created at {filepath}")
+                return False
         else:
-            print(f"Error taking photo: {result.stderr}")
+            print(f"Error taking photo (return code {result.returncode}):")
+            if result.stderr:
+                print(f"STDERR: {result.stderr}")
+            if result.stdout:
+                print(f"STDOUT: {result.stdout}")
             return False
             
     except subprocess.TimeoutExpired:
@@ -131,7 +149,13 @@ def eight_step_rotation_with_photos(port, baudrate, servo_id, output_dir, start_
         end_position (int): Ending position (default: 4095).
     """
     # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
+    try:
+        output_dir = os.path.abspath(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"Output directory created/verified: {output_dir}")
+    except Exception as e:
+        print(f"Error creating output directory {output_dir}: {e}")
+        return
     
     # Calculate 8 equal distant positions
     step = (end_position - start_position) / 7  # 7 steps to get 8 positions
