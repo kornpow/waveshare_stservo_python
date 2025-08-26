@@ -106,8 +106,7 @@ def take_photo(output_dir, position_index):
             "--width", "1280",
             "--height", "720", 
             "--immediate",
-            "--output", filepath,
-            "--datetime"
+            "--output", filepath
         ]
         
         print(f"Running command: {' '.join(cmd)}")
