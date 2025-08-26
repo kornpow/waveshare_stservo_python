@@ -10,6 +10,7 @@ import argparse
 import subprocess
 import os
 from datetime import datetime
+from PIL import Image
 from stservo.sdk import *
 
 # Register Addresses
@@ -115,8 +116,19 @@ def take_photo(output_dir, position_index):
         if result.returncode == 0:
             # Check if file was actually created
             if os.path.exists(filepath):
-                print(f"Photo saved successfully: {filepath}")
-                return True
+                print(f"Photo captured successfully: {filepath}")
+                
+                # Rotate the image 90 degrees using PIL
+                try:
+                    print("Rotating image 90 degrees...")
+                    with Image.open(filepath) as img:
+                        rotated_img = img.rotate(-90, expand=True)
+                        rotated_img.save(filepath)
+                    print(f"Image rotated and saved: {filepath}")
+                    return True
+                except Exception as e:
+                    print(f"Error rotating image: {e}")
+                    return False
             else:
                 print(f"Error: Photo file was not created at {filepath}")
                 return False
