@@ -78,16 +78,17 @@ def wait_for_move_completion(packetHandler: Any, servo_id: int, timeout: int = 1
     print("Warning: Timeout occurred while waiting for the servo to stop.")
     return False
 
-def move_servo(port: str, baudrate: int, servo_id: int, position: int, speed: int, acceleration: int, timeout: int) -> None:
+def move_servo(port: str, baudrate: int, servo_id: int, position: int, speed: int, acceleration: int, timeout: int) -> bool:
     """
     Connects to a servo and moves it to a specified position.
     """
     portHandler = PortHandler(port)
     packetHandler = sts(portHandler)
+    has_error = False
 
     if not portHandler.openPort() or not portHandler.setBaudRate(baudrate):
         print(f"Error: Failed to connect to the servo at {port}")
-        return
+        has_error = True
 
     print(f"Successfully connected to {port} at {baudrate} baud.")
 
@@ -110,8 +111,10 @@ def move_servo(port: str, baudrate: int, servo_id: int, position: int, speed: in
             set_torque(packetHandler, servo_id, False)
         except RuntimeError as e:
             print(e) # If disabling torque fails, print the error but don't crash
+            has_error = True
         portHandler.closePort()
         print("Port closed.")
+        return has_error
 
 def main() -> None:
     """
