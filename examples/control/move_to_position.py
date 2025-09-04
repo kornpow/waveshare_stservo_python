@@ -84,7 +84,7 @@ def move_servo(port: str, baudrate: int, servo_id: int, position: int, speed: in
     """
     portHandler = PortHandler(port)
     packetHandler = sts(portHandler)
-    has_error = False
+    error = False
 
     if not portHandler.openPort() or not portHandler.setBaudRate(baudrate):
         print(f"Error: Failed to connect to the servo at {port}")
@@ -114,7 +114,9 @@ def move_servo(port: str, baudrate: int, servo_id: int, position: int, speed: in
             has_error = True
         portHandler.closePort()
         print("Port closed.")
-        return has_error
+        print(f"Has error: {has_error}")
+        # On success return True, on error return False
+        return not has_error
 
 def main() -> None:
     """
