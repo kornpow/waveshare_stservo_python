@@ -84,11 +84,11 @@ def move_servo(port: str, baudrate: int, servo_id: int, position: int, speed: in
     """
     portHandler = PortHandler(port)
     packetHandler = sts(portHandler)
-    error = False
+    has_error = False
 
     if not portHandler.openPort() or not portHandler.setBaudRate(baudrate):
         print(f"Error: Failed to connect to the servo at {port}")
-        has_error = True
+        return False
 
     print(f"Successfully connected to {port} at {baudrate} baud.")
 
@@ -100,10 +100,15 @@ def move_servo(port: str, baudrate: int, servo_id: int, position: int, speed: in
         comm_result, error = packetHandler.WritePosEx(servo_id, position, speed, acceleration)
         if comm_result != COMM_SUCCESS or error != 0:
             print("Error: Failed to write position.")
+            has_error = True
         else:
             print("Position written successfully.")
             # Wait for the move to finish
             wait_for_move_completion(packetHandler, servo_id, timeout=timeout)
+
+    except RuntimeError as e:
+        print(f"Error: {e}")
+        has_error = True
 
     finally:
         # Always try to disable torque and close the port
