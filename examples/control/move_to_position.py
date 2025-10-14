@@ -1,9 +1,17 @@
+#!/usr/bin/env python
+"""
+Example: Move a servo to a specific position using the high-level control API.
+
+This example demonstrates how to use the move_servo() function from the stservo
+package to easily control servo position.
+"""
+
 import sys
 import os
-import time
 import argparse
-from typing import Any, Tuple
-from stservo.sdk import *
+
+# Import the high-level control function
+from stservo import move_servo, DEFAULT_BAUDRATE, STS_MOVING_SPEED, STS_ACC
 
 # Import config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'config')))
@@ -13,112 +21,6 @@ except ImportError:
     def load_device_port():
         return "/dev/ttyACM0"
 
-# Register Addresses
-STS_TORQUE_ENABLE = 40
-STS_PRESENT_POSITION_L = 56
-
-# Default settings
-DEFAULT_BAUDRATE = 1000000
-STS_MOVING_SPEED = 2400
-STS_ACC = 50
-
-# Communication results
-COMM_SUCCESS = 0
-
-def set_torque(packetHandler: Any, servo_id: int, enable: bool) -> None:
-    """
-    Enables or disables the servo's torque.
-    Raises a RuntimeError if the command fails.
-    """
-    status_str = "enable" if enable else "disable"
-    comm_result, error = packetHandler.write1ByteTxRx(servo_id, STS_TORQUE_ENABLE, 1 if enable else 0)
-    if comm_result != COMM_SUCCESS or error != 0:
-        raise RuntimeError(f"Failed to {status_str} torque for servo ID {servo_id}")
-    print(f"Torque {status_str}d for servo ID: {servo_id}")
-
-def check_position(packetHandler: Any, servo_id: int) -> Tuple[int, bool]:
-    """
-    Reads and returns the current position of the servo.
-    """
-    position, comm_result, error = packetHandler.read2ByteTxRx(servo_id, STS_PRESENT_POSITION_L)
-    if comm_result != COMM_SUCCESS or error != 0:
-        return -1, False
-    return position, True
-
-def wait_for_move_completion(packetHandler: Any, servo_id: int, timeout: int = 10) -> bool:
-    """
-    Waits for the servo to stop moving by polling its position.
-    The move is considered complete when the position is stable for 0.25 seconds.
-    Returns True if the move completes, False on timeout.
-    """
-    # Initial delay to allow the move to start
-    time.sleep(0.5)
-
-    start_time = time.time()
-    last_position, success = check_position(packetHandler, servo_id)
-    if not success:
-        print("Error: Could not read initial position to check for move completion.")
-        return False
-    
-    print(f"Current position: {last_position}")
-    time_at_last_change = time.time()
-
-    while time.time() - start_time < timeout:
-        current_position, success = check_position(packetHandler, servo_id)
-        if not success:
-            # On a read error, just continue and try again
-            time.sleep(0.05)
-            continue
-
-        if current_position != last_position:
-            last_position = current_position
-            print(f"Current position: {current_position}")
-            time_at_last_change = time.time()
-        
-        # If position has been stable for 0.25 seconds, the move is complete
-        if time.time() - time_at_last_change > 0.25:
-            print(f"Servo has stopped at position: {current_position}")
-            return True
-
-        time.sleep(0.05)  # Poll every 50ms
-
-    print("Warning: Timeout occurred while waiting for the servo to stop.")
-    return False
-
-def move_servo(port: str, baudrate: int, servo_id: int, position: int, speed: int, acceleration: int, timeout: int) -> None:
-    """
-    Connects to a servo and moves it to a specified position.
-    """
-    portHandler = PortHandler(port)
-    packetHandler = sts(portHandler)
-
-    if not portHandler.openPort() or not portHandler.setBaudRate(baudrate):
-        print(f"Error: Failed to connect to the servo at {port}")
-        return
-
-    print(f"Successfully connected to {port} at {baudrate} baud.")
-
-    try:
-        set_torque(packetHandler, servo_id, True)
-
-        # Send the move command
-        print(f"Moving servo {servo_id} to position {position}...")
-        comm_result, error = packetHandler.WritePosEx(servo_id, position, speed, acceleration)
-        if comm_result != COMM_SUCCESS or error != 0:
-            print("Error: Failed to write position.")
-        else:
-            print("Position written successfully.")
-            # Wait for the move to finish
-            wait_for_move_completion(packetHandler, servo_id, timeout=timeout)
-
-    finally:
-        # Always try to disable torque and close the port
-        try:
-            set_torque(packetHandler, servo_id, False)
-        except RuntimeError as e:
-            print(e) # If disabling torque fails, print the error but don't crash
-        portHandler.closePort()
-        print("Port closed.")
 
 def main() -> None:
     """
@@ -166,6 +68,11 @@ def main() -> None:
         default=10,
         help="The timeout in seconds to wait for the move to complete."
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress status messages."
+    )
 
     args = parser.parse_args()
 
@@ -173,16 +80,21 @@ def main() -> None:
         print("Error: Position must be between 0 and 4095.")
         sys.exit(1)
 
-
-    move_servo(
+    # Use the high-level move_servo function
+    success = move_servo(
         port=args.port,
-        baudrate=args.baudrate,
         servo_id=args.servo_id,
         position=args.position,
+        baudrate=args.baudrate,
         speed=args.speed,
         acceleration=args.acceleration,
-        timeout=args.timeout
+        timeout=args.timeout,
+        verbose=not args.quiet
     )
+
+    if not success:
+        print("Error: Failed to move servo.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
